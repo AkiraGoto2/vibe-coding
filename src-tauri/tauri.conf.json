@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "productName": "Break Reminder",
+  "version": "1.0.0",
+  "identifier": "com.breakreminder.app",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../out"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Break Reminder",
+        "width": 400,
+        "height": 500,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "visible": false,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false
+      }
+    ],
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false
+    },
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    },
+    "shortDescription": "Break Reminder App",
+    "longDescription": "Desktop application that reminds you to take exercise breaks every 60 minutes",
+    "copyright": "Copyright 2024",
+    "category": "Utility",
+    "publisher": "Break Reminder"
+  },
+  "plugins": {
+    "autostart": {
+      "macOSExtraPath": ""
+    }
+  }
+}
