@@ -1,15 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable static export for Tauri build (uncomment for production)
-  // output: 'export',
   typescript: {
     ignoreBuildErrors: true,
   },
   images: {
     unoptimized: true,
+    remotePatterns: [
+      { protocol: "https", hostname: "media.giphy.com" },
+      { protocol: "https", hostname: "media0.giphy.com" },
+      { protocol: "https", hostname: "media1.giphy.com" },
+      { protocol: "https", hostname: "media2.giphy.com" },
+      { protocol: "https", hostname: "media3.giphy.com" },
+      { protocol: "https", hostname: "media4.giphy.com" },
+    ],
   },
-  // Disable trailing slashes for Tauri compatibility
-  // trailingSlash: false,
 }
 
 export default nextConfig

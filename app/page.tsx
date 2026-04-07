@@ -7,11 +7,13 @@ import { TimerDisplay } from "@/components/timer-display";
 import { SettingsPanel } from "@/components/settings-panel";
 import { BreakScreen } from "@/components/break-screen";
 import { useTimer, useAutostart } from "@/hooks/use-tauri";
-import { Play, Pause, RotateCcw, Timer, Activity, Moon, Sun } from "lucide-react";
+import { useLanguage } from "@/hooks/use-language";
+import { Play, Pause, RotateCcw, Timer, Activity } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useTheme } from "next-themes";
 
 export default function Home() {
+  const { t, language, changeLanguage } = useLanguage();
+
   const {
     timerState,
     startTimer,
@@ -25,7 +27,6 @@ export default function Home() {
   } = useTimer();
 
   const { enabled: autostartEnabled, toggle: toggleAutostart } = useAutostart();
-  const { theme, setTheme } = useTheme();
 
   // Auto-trigger break when timer reaches 0
   useEffect(() => {
@@ -34,34 +35,21 @@ export default function Home() {
     }
   }, [timerState.remaining_seconds, timerState.is_break_time, showBreakWindow]);
 
-  // Keyboard shortcuts (only when not on break screen)
+  // Keyboard shortcuts (Space = play/pause, only on main screen)
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.code === "Space" && !timerState.is_break_time) {
         e.preventDefault();
-        if (timerState.is_running) {
-          pauseTimer();
-        } else {
-          startTimer();
-        }
+        timerState.is_running ? pauseTimer() : startTimer();
       }
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [timerState.is_running, timerState.is_break_time, pauseTimer, startTimer]);
 
   const handlePlayPause = useCallback(() => {
-    if (timerState.is_running) {
-      pauseTimer();
-    } else {
-      startTimer();
-    }
+    timerState.is_running ? pauseTimer() : startTimer();
   }, [timerState.is_running, pauseTimer, startTimer]);
-
-  const toggleTheme = useCallback(() => {
-    setTheme(theme === "dark" ? "light" : "dark");
-  }, [theme, setTheme]);
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -70,129 +58,118 @@ export default function Home() {
           <BreakScreen
             breakDuration={timerState.break_duration}
             onComplete={completeBreak}
+            t={t}
+            exerciseTranslations={t.exercises}
           />
         )}
       </AnimatePresence>
 
-      {/* Main app UI */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
         className="flex-1 flex flex-col items-center justify-center p-6"
       >
         {/* Header */}
-        <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <Activity className="w-5 h-5 text-primary-foreground" />
+        <div className="absolute top-5 left-5 right-5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm">
+              <Activity className="w-4.5 h-4.5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-semibold text-foreground">Break Reminder</h1>
-              <p className="text-xs text-muted-foreground">
-                {isTauriAvailable ? "Desktop App" : "Web Preview"}
+              <h1 className="font-semibold text-sm text-foreground leading-tight">{t.appName}</h1>
+              <p className="text-xs text-muted-foreground leading-tight">
+                {isTauriAvailable ? t.desktopApp : t.webPreview}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Theme toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full"
-              onClick={toggleTheme}
-              title="Toggle theme"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
-            </Button>
-
-            <SettingsPanel
-              workDuration={timerState.work_duration}
-              breakDuration={timerState.break_duration}
-              onWorkDurationChange={setWorkDuration}
-              onBreakDurationChange={setBreakDuration}
-              autostart={autostartEnabled}
-              onAutostartChange={toggleAutostart}
-            />
-          </div>
+          <SettingsPanel
+            workDuration={timerState.work_duration}
+            breakDuration={timerState.break_duration}
+            onWorkDurationChange={setWorkDuration}
+            onBreakDurationChange={setBreakDuration}
+            autostart={autostartEnabled}
+            onAutostartChange={toggleAutostart}
+            language={language}
+            onLanguageChange={changeLanguage}
+            t={t}
+          />
         </div>
 
-        {/* Timer */}
+        {/* Timer circle */}
         <TimerDisplay
           remainingSeconds={timerState.remaining_seconds}
           isRunning={timerState.is_running}
           totalSeconds={timerState.work_duration * 60}
+          t={t}
         />
 
         {/* Controls */}
-        <div className="flex items-center gap-4 mt-8">
+        <div className="flex items-center gap-4 mt-7">
           <Button
             variant="outline"
             size="icon"
             onClick={resetTimer}
-            className="w-12 h-12 rounded-full"
-            title="Reset timer"
+            className="w-11 h-11 rounded-full"
+            title={t.reset}
           >
-            <RotateCcw className="h-5 w-5" />
+            <RotateCcw className="h-4 w-4" />
           </Button>
 
           <Button
             size="lg"
             onClick={handlePlayPause}
-            className="w-16 h-16 rounded-full"
-            title={timerState.is_running ? "Pause" : "Start"}
+            className="w-16 h-16 rounded-full shadow-md"
           >
-            {timerState.is_running ? (
-              <Pause className="h-6 w-6" />
-            ) : (
-              <Play className="h-6 w-6 ml-0.5" />
-            )}
+            {timerState.is_running
+              ? <Pause className="h-6 w-6" />
+              : <Play className="h-6 w-6 ml-0.5" />
+            }
           </Button>
 
           <Button
             variant="outline"
             size="icon"
             onClick={showBreakWindow}
-            className="w-12 h-12 rounded-full"
-            title="Start break now"
+            className="w-11 h-11 rounded-full"
+            title={t.startBreakNow}
           >
-            <Timer className="h-5 w-5" />
+            <Timer className="h-4 w-4" />
           </Button>
         </div>
 
-        {/* Status cards */}
-        <div className="grid grid-cols-2 gap-4 mt-12 w-full max-w-sm">
-          <Card className="bg-card/50 border-border/50">
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3 mt-10 w-full max-w-xs">
+          <Card className="bg-card/60 border-border/50">
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                Work
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+                {t.work}
               </p>
-              <p className="text-2xl font-semibold text-foreground mt-1">
-                {timerState.work_duration} min
+              <p className="text-2xl font-semibold tabular-nums">
+                {timerState.work_duration}
+                <span className="text-sm font-normal text-muted-foreground ml-1">{t.min}</span>
               </p>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 border-border/50">
+          <Card className="bg-card/60 border-border/50">
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                Break
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+                {t.break}
               </p>
-              <p className="text-2xl font-semibold text-foreground mt-1">
-                {timerState.break_duration} min
+              <p className="text-2xl font-semibold tabular-nums">
+                {timerState.break_duration}
+                <span className="text-sm font-normal text-muted-foreground ml-1">{t.min}</span>
               </p>
             </CardContent>
           </Card>
         </div>
 
         {/* Hint */}
-        <p className="mt-8 text-sm text-muted-foreground">
-          Press{" "}
-          <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Space</kbd>{" "}
-          to pause/resume
+        <p className="mt-7 text-xs text-muted-foreground">
+          {t.pressSpace}{" "}
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Space</kbd>{" "}
+          {t.toToggle}
         </p>
       </motion.div>
     </main>

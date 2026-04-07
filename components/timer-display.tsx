@@ -1,67 +1,61 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { Translations } from "@/lib/i18n";
 
 interface TimerDisplayProps {
   remainingSeconds: number;
   isRunning: boolean;
   totalSeconds: number;
+  t: Translations;
 }
 
-export function TimerDisplay({ remainingSeconds, isRunning, totalSeconds }: TimerDisplayProps) {
+export function TimerDisplay({ remainingSeconds, isRunning, totalSeconds, t }: TimerDisplayProps) {
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
 
-  // Avoid division by zero
   const safeTotal = totalSeconds > 0 ? totalSeconds : 1;
-  const progress = ((safeTotal - remainingSeconds) / safeTotal) * 100;
-  const circumference = 2 * Math.PI * 120;
+  const progress = Math.min(((safeTotal - remainingSeconds) / safeTotal) * 100, 100);
+  const circumference = 2 * Math.PI * 110;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
-  const isLowTime = remainingSeconds <= 300; // 5 minutes or less
+  const isLowTime = remainingSeconds <= 300;
+  const isVeryLow = remainingSeconds <= 60;
 
   return (
     <div className="relative flex items-center justify-center">
-      {/* Background circle */}
-      <svg className="w-72 h-72 -rotate-90" viewBox="0 0 256 256">
+      <svg className="w-64 h-64 -rotate-90" viewBox="0 0 256 256">
+        {/* Track */}
+        <circle cx="128" cy="128" r="110" fill="none" stroke="currentColor" strokeWidth="6" className="text-muted/60" />
+        {/* Progress */}
         <circle
           cx="128"
           cy="128"
-          r="120"
+          r="110"
           fill="none"
           stroke="currentColor"
-          strokeWidth="8"
-          className="text-muted"
-        />
-        <circle
-          cx="128"
-          cy="128"
-          r="120"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="8"
+          strokeWidth="6"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           className={cn(
             "transition-all duration-1000 ease-linear",
-            isLowTime ? "text-orange-400" : "text-primary"
+            isVeryLow ? "text-red-500" : isLowTime ? "text-orange-400" : "text-primary"
           )}
         />
       </svg>
 
-      {/* Timer text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span
           className={cn(
-            "text-6xl font-light tracking-tight tabular-nums",
-            isLowTime ? "text-orange-400" : "text-foreground"
+            "text-5xl font-light tracking-tight tabular-nums font-mono",
+            isVeryLow ? "text-red-500" : isLowTime ? "text-orange-400" : "text-foreground"
           )}
         >
           {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
         </span>
-        <span className="text-sm text-muted-foreground mt-2">
-          {isRunning ? "Until break" : "Paused"}
+        <span className="text-xs text-muted-foreground mt-2 uppercase tracking-widest">
+          {isRunning ? t.untilBreak : t.paused}
         </span>
       </div>
     </div>
