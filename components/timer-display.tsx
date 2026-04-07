@@ -11,11 +11,13 @@ interface TimerDisplayProps {
 export function TimerDisplay({ remainingSeconds, isRunning, totalSeconds }: TimerDisplayProps) {
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
-  
-  const progress = ((totalSeconds - remainingSeconds) / totalSeconds) * 100;
+
+  // Avoid division by zero
+  const safeTotal = totalSeconds > 0 ? totalSeconds : 1;
+  const progress = ((safeTotal - remainingSeconds) / safeTotal) * 100;
   const circumference = 2 * Math.PI * 120;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
-  
+
   const isLowTime = remainingSeconds <= 300; // 5 minutes or less
 
   return (
@@ -43,17 +45,17 @@ export function TimerDisplay({ remainingSeconds, isRunning, totalSeconds }: Time
           strokeDashoffset={strokeDashoffset}
           className={cn(
             "transition-all duration-1000 ease-linear",
-            isLowTime ? "text-warning" : "text-primary"
+            isLowTime ? "text-orange-400" : "text-primary"
           )}
         />
       </svg>
-      
+
       {/* Timer text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span 
+        <span
           className={cn(
             "text-6xl font-light tracking-tight tabular-nums",
-            isLowTime ? "text-warning" : "text-foreground"
+            isLowTime ? "text-orange-400" : "text-foreground"
           )}
         >
           {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}

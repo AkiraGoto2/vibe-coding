@@ -7,8 +7,9 @@ import { TimerDisplay } from "@/components/timer-display";
 import { SettingsPanel } from "@/components/settings-panel";
 import { BreakScreen } from "@/components/break-screen";
 import { useTimer, useAutostart } from "@/hooks/use-tauri";
-import { Play, Pause, RotateCcw, Timer, Activity } from "lucide-react";
+import { Play, Pause, RotateCcw, Timer, Activity, Moon, Sun } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTheme } from "next-themes";
 
 export default function Home() {
   const {
@@ -24,6 +25,7 @@ export default function Home() {
   } = useTimer();
 
   const { enabled: autostartEnabled, toggle: toggleAutostart } = useAutostart();
+  const { theme, setTheme } = useTheme();
 
   // Auto-trigger break when timer reaches 0
   useEffect(() => {
@@ -32,7 +34,7 @@ export default function Home() {
     }
   }, [timerState.remaining_seconds, timerState.is_break_time, showBreakWindow]);
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (only when not on break screen)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space" && !timerState.is_break_time) {
@@ -57,10 +59,9 @@ export default function Home() {
     }
   }, [timerState.is_running, pauseTimer, startTimer]);
 
-  // For demo: trigger break manually
-  const triggerBreak = useCallback(() => {
-    showBreakWindow();
-  }, [showBreakWindow]);
+  const toggleTheme = useCallback(() => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  }, [theme, setTheme]);
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
@@ -92,14 +93,32 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <SettingsPanel
-            workDuration={timerState.work_duration}
-            breakDuration={timerState.break_duration}
-            onWorkDurationChange={setWorkDuration}
-            onBreakDurationChange={setBreakDuration}
-            autostart={autostartEnabled}
-            onAutostartChange={toggleAutostart}
-          />
+
+          <div className="flex items-center gap-2">
+            {/* Theme toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full"
+              onClick={toggleTheme}
+              title="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </Button>
+
+            <SettingsPanel
+              workDuration={timerState.work_duration}
+              breakDuration={timerState.break_duration}
+              onWorkDurationChange={setWorkDuration}
+              onBreakDurationChange={setBreakDuration}
+              autostart={autostartEnabled}
+              onAutostartChange={toggleAutostart}
+            />
+          </div>
         </div>
 
         {/* Timer */}
@@ -116,6 +135,7 @@ export default function Home() {
             size="icon"
             onClick={resetTimer}
             className="w-12 h-12 rounded-full"
+            title="Reset timer"
           >
             <RotateCcw className="h-5 w-5" />
           </Button>
@@ -124,6 +144,7 @@ export default function Home() {
             size="lg"
             onClick={handlePlayPause}
             className="w-16 h-16 rounded-full"
+            title={timerState.is_running ? "Pause" : "Start"}
           >
             {timerState.is_running ? (
               <Pause className="h-6 w-6" />
@@ -135,7 +156,7 @@ export default function Home() {
           <Button
             variant="outline"
             size="icon"
-            onClick={triggerBreak}
+            onClick={showBreakWindow}
             className="w-12 h-12 rounded-full"
             title="Start break now"
           >
@@ -169,7 +190,9 @@ export default function Home() {
 
         {/* Hint */}
         <p className="mt-8 text-sm text-muted-foreground">
-          Press <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Space</kbd> to pause/resume
+          Press{" "}
+          <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">Space</kbd>{" "}
+          to pause/resume
         </p>
       </motion.div>
     </main>

@@ -45,13 +45,13 @@ export function useTauri() {
 
   const invoke = useCallback(async <T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> => {
     if (!isTauri()) {
-      console.log("[v0] Tauri not available, using mock for:", cmd);
+      console.log("[dev] Tauri not available, using mock for:", cmd);
       return null;
     }
     try {
       return await window.__TAURI__!.core.invoke<T>(cmd, args);
     } catch (error) {
-      console.error("[v0] Tauri invoke error:", error);
+      console.error("[dev] Tauri invoke error:", error);
       return null;
     }
   }, []);
@@ -63,7 +63,7 @@ export function useTauri() {
     try {
       return await window.__TAURI__!.event.listen<T>(event, (e) => handler(e.payload));
     } catch (error) {
-      console.error("[v0] Tauri listen error:", error);
+      console.error("[dev] Tauri listen error:", error);
       return () => {};
     }
   }, []);
@@ -73,17 +73,17 @@ export function useTauri() {
 
 export function useTimer() {
   const { invoke, listen, isAvailable } = useTauri();
-  
+
   // Default state for web preview
   const [timerState, setTimerState] = useState<TimerState>({
-    remaining_seconds: 60 * 60,
-    is_running: true,
+    remaining_seconds: 60 * 25, // FIX: default 25 min pomodoro, not 60
+    is_running: false, // FIX: don't auto-start, let user press play
     is_break_time: false,
-    work_duration: 60,
-    break_duration: 10,
+    work_duration: 25,
+    break_duration: 5,
   });
 
-  // Fetch initial state
+  // Fetch initial state from Tauri
   useEffect(() => {
     if (isAvailable) {
       invoke<TimerState>("get_timer_state").then((state) => {
@@ -95,7 +95,8 @@ export function useTimer() {
   // Local timer countdown for web preview
   useEffect(() => {
     if (isAvailable) return; // Tauri handles the timer
-    
+
+    // FIX: stop countdown when is_break_time is true
     if (!timerState.is_running || timerState.is_break_time) return;
 
     const interval = setInterval(() => {
@@ -104,7 +105,6 @@ export function useTimer() {
           return {
             ...prev,
             remaining_seconds: 0,
-            is_break_time: true,
             is_running: false,
           };
         }
@@ -161,7 +161,7 @@ export function useTimer() {
       ...prev,
       remaining_seconds: prev.work_duration * 60,
       is_break_time: false,
-      is_running: true,
+      is_running: false, // FIX: don't auto-start after reset
     }));
   }, [isAvailable, invoke]);
 
@@ -173,6 +173,7 @@ export function useTimer() {
       ...prev,
       work_duration: minutes,
       remaining_seconds: prev.is_break_time ? prev.remaining_seconds : minutes * 60,
+      is_running: false, // FIX: pause when settings change
     }));
   }, [isAvailable, invoke]);
 
@@ -192,7 +193,7 @@ export function useTimer() {
       ...prev,
       is_break_time: false,
       remaining_seconds: prev.work_duration * 60,
-      is_running: true,
+      is_running: false, // FIX: let user manually start after break
     }));
   }, [isAvailable, invoke]);
 
@@ -200,7 +201,11 @@ export function useTimer() {
     if (isAvailable) {
       await invoke("show_break_window");
     }
-    setTimerState((prev) => ({ ...prev, is_break_time: true }));
+    setTimerState((prev) => ({
+      ...prev,
+      is_break_time: true,
+      is_running: false,
+    }));
   }, [isAvailable, invoke]);
 
   return {

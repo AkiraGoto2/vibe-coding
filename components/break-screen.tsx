@@ -12,18 +12,28 @@ interface BreakScreenProps {
 
 export function BreakScreen({ breakDuration, onComplete }: BreakScreenProps) {
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
+  // FIX: initialize currentTime at 0, not stale value
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [selectedExercises, setSelectedExercises] = useState(exercises.slice(0, 4));
 
   // Select random exercises based on break duration
   useEffect(() => {
-    const numExercises = Math.min(Math.floor(breakDuration / 2), 6);
+    const numExercises = Math.max(1, Math.min(Math.floor(breakDuration / 2), 6));
     const shuffled = [...exercises].sort(() => Math.random() - 0.5);
     setSelectedExercises(shuffled.slice(0, numExercises));
+    // Reset state when break starts
+    setCurrentExerciseIndex(0);
+    setCurrentTime(0);
+    setIsPlaying(true);
   }, [breakDuration]);
 
   const currentExercise = selectedExercises[currentExerciseIndex];
+
+  // FIX: reset currentTime when exercise changes
+  useEffect(() => {
+    setCurrentTime(0);
+  }, [currentExerciseIndex]);
 
   // Timer logic
   useEffect(() => {
@@ -32,11 +42,14 @@ export function BreakScreen({ breakDuration, onComplete }: BreakScreenProps) {
     const interval = setInterval(() => {
       setCurrentTime((prev) => {
         if (prev >= currentExercise.duration) {
-          // Move to next exercise
+          // Auto-advance to next exercise
           if (currentExerciseIndex < selectedExercises.length - 1) {
             setCurrentExerciseIndex((i) => i + 1);
+            // currentTime will be reset by the effect above
             return 0;
           }
+          // Last exercise finished — auto complete
+          clearInterval(interval);
           return prev;
         }
         return prev + 1;
@@ -45,6 +58,16 @@ export function BreakScreen({ breakDuration, onComplete }: BreakScreenProps) {
 
     return () => clearInterval(interval);
   }, [isPlaying, currentExercise, currentExerciseIndex, selectedExercises.length]);
+
+  // FIX: auto-complete when last exercise finishes
+  useEffect(() => {
+    if (!currentExercise) return;
+    const isLastExercise = currentExerciseIndex === selectedExercises.length - 1;
+    if (isLastExercise && currentTime >= currentExercise.duration) {
+      const timeout = setTimeout(() => onComplete(), 1000);
+      return () => clearTimeout(timeout);
+    }
+  }, [currentTime, currentExercise, currentExerciseIndex, selectedExercises.length, onComplete]);
 
   const handlePlayPause = useCallback(() => {
     setIsPlaying((prev) => !prev);
@@ -57,9 +80,17 @@ export function BreakScreen({ breakDuration, onComplete }: BreakScreenProps) {
     }
   }, [currentExerciseIndex, selectedExercises.length]);
 
-  const handleComplete = useCallback(() => {
-    onComplete();
-  }, [onComplete]);
+  // FIX: keyboard shortcut for break screen Space
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        setIsPlaying((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   if (!currentExercise) return null;
 
@@ -73,10 +104,10 @@ export function BreakScreen({ breakDuration, onComplete }: BreakScreenProps) {
       {/* Header */}
       <div className="absolute top-8 left-8 right-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Break Time</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Break Time 🧘</h1>
           <p className="text-muted-foreground">Time to stretch and move</p>
         </div>
-        
+
         {/* Progress dots */}
         <div className="flex gap-2">
           {selectedExercises.map((_, index) => (
@@ -109,7 +140,7 @@ export function BreakScreen({ breakDuration, onComplete }: BreakScreenProps) {
             isPlaying={isPlaying}
             onPlayPause={handlePlayPause}
             onSkip={handleSkip}
-            onComplete={handleComplete}
+            onComplete={onComplete}
             isLast={currentExerciseIndex === selectedExercises.length - 1}
             exerciseIndex={currentExerciseIndex}
             totalExercises={selectedExercises.length}

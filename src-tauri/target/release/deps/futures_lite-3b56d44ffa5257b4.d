@@ -1,0 +1,11 @@
+C:\Users\akira\Downloads\b_LU0SFi5nkAY\src-tauri\target\release\deps\futures_lite-3b56d44ffa5257b4.d: C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\lib.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\future.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\prelude.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\stream.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\io.rs
+
+C:\Users\akira\Downloads\b_LU0SFi5nkAY\src-tauri\target\release\deps\libfutures_lite-3b56d44ffa5257b4.rlib: C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\lib.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\future.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\prelude.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\stream.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\io.rs
+
+C:\Users\akira\Downloads\b_LU0SFi5nkAY\src-tauri\target\release\deps\libfutures_lite-3b56d44ffa5257b4.rmeta: C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\lib.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\future.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\prelude.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\stream.rs C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\io.rs
+
+C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\lib.rs:
+C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\future.rs:
+C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\prelude.rs:
+C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\stream.rs:
+C:\Users\akira\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\futures-lite-2.6.1\src\io.rs:
