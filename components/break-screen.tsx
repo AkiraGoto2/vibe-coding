@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Translations } from "@/lib/i18n";
 
 interface BreakScreenProps {
-  breakDuration: number; // in minutes
+  breakDuration: number;
   onComplete: () => void;
   t: Translations;
   exerciseTranslations: Translations["exercises"];
@@ -19,22 +19,18 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
   const [isPlaying, setIsPlaying] = useState(true);
   const [selectedExercises, setSelectedExercises] = useState(exercises.slice(0, 3));
 
-  // Select exercises that fit within breakDuration
   useEffect(() => {
-    const totalBreakSeconds = breakDuration * 60;
+    const totalSecs = breakDuration * 60;
     const shuffled = [...exercises].sort(() => Math.random() - 0.5);
-
-    // Pick exercises until we fill the break duration
     const selected = [];
     let accumulated = 0;
     for (const ex of shuffled) {
-      if (accumulated + ex.duration <= totalBreakSeconds || selected.length === 0) {
+      if (accumulated + ex.duration <= totalSecs || selected.length === 0) {
         selected.push(ex);
         accumulated += ex.duration;
-        if (accumulated >= totalBreakSeconds) break;
+        if (accumulated >= totalSecs) break;
       }
     }
-
     setSelectedExercises(selected.length > 0 ? selected : shuffled.slice(0, 2));
     setCurrentExerciseIndex(0);
     setCurrentTime(0);
@@ -43,44 +39,35 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
 
   const currentExercise = selectedExercises[currentExerciseIndex];
 
-  // FIX: reset timer when exercise changes
-  useEffect(() => {
-    setCurrentTime(0);
-  }, [currentExerciseIndex]);
+  useEffect(() => { setCurrentTime(0); }, [currentExerciseIndex]);
 
-  // Countdown timer — tied to exercise.duration (the ACTUAL time)
   useEffect(() => {
     if (!isPlaying || !currentExercise) return;
-
     const interval = setInterval(() => {
       setCurrentTime((prev) => {
         const next = prev + 1;
         if (next >= currentExercise.duration) {
-          // Auto advance
           if (currentExerciseIndex < selectedExercises.length - 1) {
             setCurrentExerciseIndex((i) => i + 1);
             return 0;
           }
-          return currentExercise.duration; // clamp
+          return currentExercise.duration;
         }
         return next;
       });
     }, 1000);
-
     return () => clearInterval(interval);
   }, [isPlaying, currentExercise, currentExerciseIndex, selectedExercises.length]);
 
-  // Auto-complete when last exercise finishes
   useEffect(() => {
     if (!currentExercise) return;
     const isLast = currentExerciseIndex === selectedExercises.length - 1;
     if (isLast && currentTime >= currentExercise.duration) {
-      const t = setTimeout(() => onComplete(), 800);
-      return () => clearTimeout(t);
+      const timeout = setTimeout(() => onComplete(), 800);
+      return () => clearTimeout(timeout);
     }
   }, [currentTime, currentExercise, currentExerciseIndex, selectedExercises.length, onComplete]);
 
-  // Keyboard shortcut inside break screen
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.code === "Space") { e.preventDefault(); setIsPlaying((p) => !p); }
@@ -90,7 +77,6 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
   }, []);
 
   const handlePlayPause = useCallback(() => setIsPlaying((p) => !p), []);
-
   const handleSkip = useCallback(() => {
     if (currentExerciseIndex < selectedExercises.length - 1) {
       setCurrentExerciseIndex((i) => i + 1);
@@ -100,10 +86,9 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
 
   if (!currentExercise) return null;
 
-  // Apply i18n translations to exercise
-  const exTranslation = exerciseTranslations[currentExercise.id as keyof typeof exerciseTranslations];
-  const translatedExercise = exTranslation
-    ? { ...currentExercise, name: exTranslation.name, description: exTranslation.description }
+  const exTrans = exerciseTranslations[currentExercise.id as keyof typeof exerciseTranslations];
+  const translatedExercise = exTrans
+    ? { ...currentExercise, name: exTrans.name, description: exTrans.description }
     : currentExercise;
 
   return (
@@ -111,61 +96,63 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center p-6"
+      className="fixed inset-0 bg-background z-50 flex flex-col"
     >
-      {/* Header */}
-      <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
+      {/* ── TOP BAR ── */}
+      <div className="flex items-center justify-between px-8 pt-6 pb-4 border-b border-border/40">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">{t.breakScreen.title}</h1>
+          <h1 className="text-xl font-semibold text-foreground">{t.breakScreen.title} 🧘</h1>
           <p className="text-sm text-muted-foreground">{t.breakScreen.subtitle}</p>
         </div>
 
         {/* Progress dots */}
-        <div className="flex gap-2">
-          {selectedExercises.map((_, index) => (
+        <div className="flex items-center gap-2">
+          {selectedExercises.map((_, idx) => (
             <div
-              key={index}
-              className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-                index < currentExerciseIndex
-                  ? "bg-primary scale-90"
-                  : index === currentExerciseIndex
-                  ? "bg-primary w-6 rounded-full"
-                  : "bg-muted"
+              key={idx}
+              className={`h-2 rounded-full transition-all duration-400 ${
+                idx < currentExerciseIndex ? "w-2 bg-primary/60" :
+                idx === currentExerciseIndex ? "w-8 bg-primary" : "w-2 bg-muted"
               }`}
             />
           ))}
         </div>
       </div>
 
-      {/* Exercise card */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentExercise.id}
-          initial={{ opacity: 0, x: 60 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -60 }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-        >
-          <ExerciseCard
-            exercise={translatedExercise}
-            currentTime={currentTime}
-            isPlaying={isPlaying}
-            onPlayPause={handlePlayPause}
-            onSkip={handleSkip}
-            onComplete={onComplete}
-            isLast={currentExerciseIndex === selectedExercises.length - 1}
-            exerciseIndex={currentExerciseIndex}
-            totalExercises={selectedExercises.length}
-            t={t}
-          />
-        </motion.div>
-      </AnimatePresence>
+      {/* ── MAIN CONTENT — full height ── */}
+      <div className="flex-1 flex items-center justify-center px-6 py-4 overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentExercise.id}
+            initial={{ opacity: 0, x: 80 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -80 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="w-full h-full flex"
+          >
+            <ExerciseCard
+              exercise={translatedExercise}
+              currentTime={currentTime}
+              isPlaying={isPlaying}
+              onPlayPause={handlePlayPause}
+              onSkip={handleSkip}
+              onComplete={onComplete}
+              isLast={currentExerciseIndex === selectedExercises.length - 1}
+              exerciseIndex={currentExerciseIndex}
+              totalExercises={selectedExercises.length}
+              t={t}
+            />
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
-      {/* Keyboard hint */}
-      <p className="absolute bottom-6 text-xs text-muted-foreground">
-        <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Space</kbd>{" "}
-        {t.breakScreen.spaceHint}
-      </p>
+      {/* ── BOTTOM HINT ── */}
+      <div className="text-center pb-4">
+        <p className="text-xs text-muted-foreground">
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Space</kbd>{" "}
+          {t.breakScreen.spaceHint}
+        </p>
+      </div>
     </motion.div>
   );
 }

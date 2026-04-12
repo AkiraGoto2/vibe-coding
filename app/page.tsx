@@ -1,41 +1,76 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TimerDisplay } from "@/components/timer-display";
 import { SettingsPanel } from "@/components/settings-panel";
 import { BreakScreen } from "@/components/break-screen";
+import { AuthModal } from "@/components/auth-modal";
+import { FeedbackModal } from "@/components/feedback-modal";
 import { useTimer, useAutostart } from "@/hooks/use-tauri";
 import { useLanguage } from "@/hooks/use-language";
-import { Play, Pause, RotateCcw, Timer, Activity } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  Play, Pause, RotateCcw, Timer, Activity,
+  UserCircle2, LogOut, MessageSquare, CheckCircle2, ShieldCheck,
+} from "lucide-react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
+import {
+  DropdownMenu, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function Home() {
   const { t, language, changeLanguage } = useLanguage();
+  const { user, loading: authLoading, logout, isAdmin } = useAuth();
 
   const {
-    timerState,
-    startTimer,
-    pauseTimer,
-    resetTimer,
-    setWorkDuration,
-    setBreakDuration,
-    completeBreak,
-    showBreakWindow,
-    isTauriAvailable,
+    timerState, startTimer, pauseTimer, resetTimer,
+    setWorkDuration, setBreakDuration,
+    completeBreak, showBreakWindow, isTauriAvailable,
   } = useTimer();
 
   const { enabled: autostartEnabled, toggle: toggleAutostart } = useAutostart();
 
-  // Auto-trigger break when timer reaches 0
+  const [authOpen, setAuthOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+
+  // Sync settings from DB when user logs in
+  useEffect(() => {
+    if (!user?.settings) return;
+    const s = user.settings;
+    if (s.workDuration)  setWorkDuration(s.workDuration);
+    if (s.breakDuration) setBreakDuration(s.breakDuration);
+    if (s.language)      changeLanguage(s.language as "en" | "ru");
+  }, [user]);
+
+  // Persist settings to DB when they change
+  useEffect(() => {
+    if (!user) return;
+    const timer = setTimeout(() => {
+      fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workDuration:  timerState.work_duration,
+          breakDuration: timerState.break_duration,
+          language,
+        }),
+      }).catch(() => {});
+    }, 1000); // debounce
+    return () => clearTimeout(timer);
+  }, [timerState.work_duration, timerState.break_duration, language, user]);
+
+  // Auto-trigger break when timer hits 0
   useEffect(() => {
     if (timerState.remaining_seconds === 0 && !timerState.is_break_time) {
       showBreakWindow();
     }
   }, [timerState.remaining_seconds, timerState.is_break_time, showBreakWindow]);
 
-  // Keyboard shortcuts (Space = play/pause, only on main screen)
+  // Space shortcut (main screen only)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.code === "Space" && !timerState.is_break_time) {
@@ -53,6 +88,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
+
+      {/* ── BREAK SCREEN ── */}
       <AnimatePresence>
         {timerState.is_break_time && (
           <BreakScreen
@@ -64,17 +101,20 @@ export default function Home() {
         )}
       </AnimatePresence>
 
+      {/* ── MAIN UI ── */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
         className="flex-1 flex flex-col items-center justify-center p-6"
       >
-        {/* Header */}
+        {/* ─ Header ─ */}
         <div className="absolute top-5 left-5 right-5 flex items-center justify-between">
+
+          {/* Logo */}
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm">
-              <Activity className="w-4.5 h-4.5 text-primary-foreground" />
+              <Activity className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
               <h1 className="font-semibold text-sm text-foreground leading-tight">{t.appName}</h1>
@@ -84,20 +124,85 @@ export default function Home() {
             </div>
           </div>
 
-          <SettingsPanel
-            workDuration={timerState.work_duration}
-            breakDuration={timerState.break_duration}
-            onWorkDurationChange={setWorkDuration}
-            onBreakDurationChange={setBreakDuration}
-            autostart={autostartEnabled}
-            onAutostartChange={toggleAutostart}
-            language={language}
-            onLanguageChange={changeLanguage}
-            t={t}
-          />
+          {/* Right controls */}
+          <div className="flex items-center gap-1.5">
+
+            {/* Feedback button */}
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => setFeedbackOpen(true)}
+              className="h-9 gap-1.5 text-xs text-muted-foreground hover:text-foreground rounded-full px-3"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              {t.feedback.feedbackBtn}
+            </Button>
+
+            {/* User menu */}
+            {authLoading ? null : user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="w-9 h-9 rounded-full">
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xs font-semibold text-primary">
+                        {user.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <div className="px-3 py-2">
+                    <p className="font-medium text-sm">{user.name}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                    <p className="flex items-center gap-1 text-xs text-green-500 mt-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {t.auth.syncSettings}
+                    </p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuItem asChild className="gap-2 text-primary">
+                        <Link href="/admin">
+                          <ShieldCheck className="w-4 h-4" />
+                          {language === "ru" ? "Панель администратора" : "Admin Panel"}
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem onClick={logout} className="text-destructive gap-2">
+                    <LogOut className="w-4 h-4" />
+                    {t.auth.logout}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                variant="outline" size="sm"
+                onClick={() => setAuthOpen(true)}
+                className="h-9 gap-1.5 text-xs rounded-full px-3"
+              >
+                <UserCircle2 className="w-3.5 h-3.5" />
+                {t.auth.login}
+              </Button>
+            )}
+
+            {/* Settings */}
+            <SettingsPanel
+              workDuration={timerState.work_duration}
+              breakDuration={timerState.break_duration}
+              onWorkDurationChange={setWorkDuration}
+              onBreakDurationChange={setBreakDuration}
+              autostart={autostartEnabled}
+              onAutostartChange={toggleAutostart}
+              language={language}
+              onLanguageChange={changeLanguage}
+              t={t}
+            />
+          </div>
         </div>
 
-        {/* Timer circle */}
+        {/* ─ Timer ─ */}
         <TimerDisplay
           remainingSeconds={timerState.remaining_seconds}
           isRunning={timerState.is_running}
@@ -105,11 +210,10 @@ export default function Home() {
           t={t}
         />
 
-        {/* Controls */}
+        {/* ─ Controls ─ */}
         <div className="flex items-center gap-4 mt-7">
           <Button
-            variant="outline"
-            size="icon"
+            variant="outline" size="icon"
             onClick={resetTimer}
             className="w-11 h-11 rounded-full"
             title={t.reset}
@@ -124,13 +228,11 @@ export default function Home() {
           >
             {timerState.is_running
               ? <Pause className="h-6 w-6" />
-              : <Play className="h-6 w-6 ml-0.5" />
-            }
+              : <Play className="h-6 w-6 ml-0.5" />}
           </Button>
 
           <Button
-            variant="outline"
-            size="icon"
+            variant="outline" size="icon"
             onClick={showBreakWindow}
             className="w-11 h-11 rounded-full"
             title={t.startBreakNow}
@@ -139,13 +241,11 @@ export default function Home() {
           </Button>
         </div>
 
-        {/* Stats */}
+        {/* ─ Stats cards ─ */}
         <div className="grid grid-cols-2 gap-3 mt-10 w-full max-w-xs">
           <Card className="bg-card/60 border-border/50">
             <CardContent className="p-4">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
-                {t.work}
-              </p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">{t.work}</p>
               <p className="text-2xl font-semibold tabular-nums">
                 {timerState.work_duration}
                 <span className="text-sm font-normal text-muted-foreground ml-1">{t.min}</span>
@@ -154,9 +254,7 @@ export default function Home() {
           </Card>
           <Card className="bg-card/60 border-border/50">
             <CardContent className="p-4">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
-                {t.break}
-              </p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">{t.break}</p>
               <p className="text-2xl font-semibold tabular-nums">
                 {timerState.break_duration}
                 <span className="text-sm font-normal text-muted-foreground ml-1">{t.min}</span>
@@ -165,13 +263,22 @@ export default function Home() {
           </Card>
         </div>
 
-        {/* Hint */}
+        {/* ─ Hint ─ */}
         <p className="mt-7 text-xs text-muted-foreground">
           {t.pressSpace}{" "}
           <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Space</kbd>{" "}
           {t.toToggle}
         </p>
       </motion.div>
+
+      {/* ── MODALS ── */}
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} t={t} />
+      <FeedbackModal
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        t={t}
+        onOpenAuth={() => setAuthOpen(true)}
+      />
     </main>
   );
 }

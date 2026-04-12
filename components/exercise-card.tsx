@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Play, Pause, SkipForward, Check } from "lucide-react";
 import { Translations } from "@/lib/i18n";
 import { Exercise } from "@/lib/exercises";
-import Image from "next/image";
 
 interface ExerciseCardProps {
   exercise: Exercise;
@@ -20,6 +19,13 @@ interface ExerciseCardProps {
   t: Translations;
 }
 
+const categoryColors: Record<string, string> = {
+  stretch:  "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  strength: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+  cardio:   "bg-red-500/15 text-red-400 border-red-500/30",
+  relax:    "bg-green-500/15 text-green-400 border-green-500/30",
+};
+
 export function ExerciseCard({
   exercise,
   currentTime,
@@ -32,101 +38,111 @@ export function ExerciseCard({
   totalExercises,
   t,
 }: ExerciseCardProps) {
-  // FIX: cap progress at 100%
-  const progress = Math.min((currentTime / exercise.duration) * 100, 100);
-
+  const progress  = Math.min((currentTime / exercise.duration) * 100, 100);
   const remaining = Math.max(exercise.duration - currentTime, 0);
-  const remainingMin = Math.floor(remaining / 60);
-  const remainingSec = remaining % 60;
-
-  const categoryColors: Record<string, string> = {
-    stretch: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    strength: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-    cardio: "bg-red-500/20 text-red-400 border-red-500/30",
-    relax: "bg-green-500/20 text-green-400 border-green-500/30",
-  };
+  const remMin    = Math.floor(remaining / 60);
+  const remSec    = remaining % 60;
 
   return (
-    <Card className="w-full max-w-lg bg-card/90 backdrop-blur-sm border-border/50 shadow-2xl">
-      <CardContent className="p-0 overflow-hidden rounded-xl">
-        {/* GIF area */}
-        <div className="relative w-full aspect-video bg-muted overflow-hidden">
-          {/* FIX: Use img tag for GIFs (Next Image doesn't animate GIFs well) */}
-          <img
-            src={exercise.gifUrl}
-            alt={exercise.name}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              // Fallback: show exercise icon if GIF fails to load
-              const target = e.currentTarget;
-              target.style.display = "none";
-              const parent = target.parentElement;
-              if (parent) {
-                const fallback = parent.querySelector(".gif-fallback") as HTMLElement;
-                if (fallback) fallback.style.display = "flex";
-              }
-            }}
-          />
-          {/* Fallback when GIF can't load */}
-          <div
-            className="gif-fallback absolute inset-0 hidden items-center justify-center flex-col gap-3 bg-muted"
-          >
-            <div className="text-6xl">🏃</div>
-            <p className="text-sm text-muted-foreground">{exercise.name}</p>
-          </div>
+    /* Full-height flex layout so the card fills the parent */
+    <div className="w-full h-full flex flex-col lg:flex-row gap-4 max-w-6xl mx-auto">
 
-          {/* Countdown overlay */}
-          <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1">
-            <span className="text-white text-sm font-mono tabular-nums font-medium">
-              {String(remainingMin).padStart(2, "0")}:{String(remainingSec).padStart(2, "0")}
-            </span>
-          </div>
+      {/* ── LEFT / GIF ─────────────────────────────────────── */}
+      <div className="relative flex-1 rounded-2xl overflow-hidden bg-muted min-h-[280px] lg:min-h-0">
 
-          {/* Category badge */}
-          <div className={`absolute top-3 left-3 px-2 py-0.5 rounded-full text-xs font-medium border ${categoryColors[exercise.category] ?? ""}`}>
-            {exercise.category}
-          </div>
+        <img
+          src={exercise.gifUrl}
+          alt={exercise.name}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+            const fb = e.currentTarget.parentElement?.querySelector(".gif-fallback") as HTMLElement | null;
+            if (fb) fb.style.display = "flex";
+          }}
+        />
 
-          {/* Progress bar overlay at bottom of GIF */}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30">
-            <div
-              className="h-full bg-primary transition-all duration-1000 ease-linear"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+        {/* Fallback */}
+        <div className="gif-fallback absolute inset-0 hidden items-center justify-center flex-col gap-3 bg-muted">
+          <span className="text-7xl">🏃</span>
+          <p className="text-sm text-muted-foreground">{exercise.name}</p>
         </div>
 
-        {/* Info + controls */}
-        <div className="p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">
-                {t.breakScreen.exercise} {exerciseIndex + 1} {t.breakScreen.of} {totalExercises}
-              </p>
-              <h3 className="text-xl font-semibold text-foreground">{exercise.name}</h3>
+        {/* Category badge */}
+        <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm ${categoryColors[exercise.category] ?? ""}`}>
+          {exercise.category}
+        </div>
+
+        {/* Countdown pill */}
+        <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm rounded-full px-4 py-1.5">
+          <span className="text-white text-lg font-mono font-semibold tabular-nums">
+            {String(remMin).padStart(2, "0")}:{String(remSec).padStart(2, "0")}
+          </span>
+        </div>
+
+        {/* Progress bar at bottom of GIF */}
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/30">
+          <div
+            className="h-full bg-primary transition-all duration-1000 ease-linear"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* ── RIGHT / INFO + CONTROLS ─────────────────────────── */}
+      <div className="flex flex-col justify-between lg:w-80 xl:w-96 shrink-0">
+
+        {/* Top info */}
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2">
+            {t.breakScreen.exercise} {exerciseIndex + 1} {t.breakScreen.of} {totalExercises}
+          </p>
+          <h2 className="text-3xl xl:text-4xl font-bold text-foreground leading-tight mb-4">
+            {exercise.name}
+          </h2>
+          <p className="text-muted-foreground leading-relaxed">
+            {exercise.description}
+          </p>
+        </div>
+
+        {/* Circular progress + controls */}
+        <div className="flex flex-col items-center gap-6 mt-6">
+
+          {/* Circular progress ring */}
+          <div className="relative w-32 h-32">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 128 128">
+              <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor"
+                strokeWidth="8" className="text-muted" />
+              <circle cx="64" cy="64" r="56" fill="none" stroke="currentColor"
+                strokeWidth="8" strokeLinecap="round"
+                strokeDasharray={2 * Math.PI * 56}
+                strokeDashoffset={2 * Math.PI * 56 * (1 - progress / 100)}
+                className="text-primary transition-all duration-1000 ease-linear" />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-2xl font-mono font-semibold tabular-nums">
+                {String(remMin).padStart(2,"0")}:{String(remSec).padStart(2,"0")}
+              </span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-0.5">
+                {isPlaying ? "left" : "paused"}
+              </span>
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-            {exercise.description}
-          </p>
-
-          {/* Controls */}
-          <div className="flex items-center justify-center gap-3">
+          {/* Buttons */}
+          <div className="flex items-center gap-3 w-full">
             <Button
               variant="outline"
               size="icon"
               onClick={onPlayPause}
-              className="w-12 h-12 rounded-full"
+              className="w-12 h-12 rounded-full shrink-0"
             >
               {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
             </Button>
 
             {isLast ? (
               <Button
-                size="lg"
                 onClick={onComplete}
-                className="px-6 h-12 rounded-full gap-2 bg-green-600 hover:bg-green-700 text-white"
+                className="flex-1 h-12 rounded-full gap-2 bg-green-600 hover:bg-green-700 text-white font-medium"
               >
                 <Check className="h-4 w-4" />
                 {t.exerciseCard.complete}
@@ -134,9 +150,8 @@ export function ExerciseCard({
             ) : (
               <Button
                 variant="secondary"
-                size="lg"
                 onClick={onSkip}
-                className="px-6 h-12 rounded-full gap-2"
+                className="flex-1 h-12 rounded-full gap-2 font-medium"
               >
                 <SkipForward className="h-4 w-4" />
                 {t.exerciseCard.next}
@@ -144,7 +159,8 @@ export function ExerciseCard({
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+
+      </div>
+    </div>
   );
 }

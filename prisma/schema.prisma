@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  name          String
+  passwordHash  String
+  role          String       @default("USER")   // "USER" | "ADMIN"
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  settings      UserSettings?
+  feedback      Feedback[]
+  sessions      Session[]
+}
+
+model UserSettings {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  workDuration  Int      @default(25)
+  breakDuration Int      @default(5)
+  language      String   @default("en")
+  autostart     Boolean  @default(false)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt     DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String
+  email     String
+  subject   String
+  message   String
+  status    String   @default("new")   // "new" | "read" | "resolved"
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
