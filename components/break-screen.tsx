@@ -2,9 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ExerciseCard } from "./exercise-card";
-import { exercises } from "@/lib/exercises";
+import { useExercises } from "@/hooks/use-exercises";
+import { useSound } from "@/hooks/use-sound";
+import { Exercise } from "@/lib/exercises";
 import { motion, AnimatePresence } from "framer-motion";
 import { Translations } from "@/lib/i18n";
+import { Loader2 } from "lucide-react";
 
 interface BreakScreenProps {
   breakDuration: number;
@@ -14,16 +17,23 @@ interface BreakScreenProps {
 }
 
 export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations }: BreakScreenProps) {
+  const { exercises: allExercises, loading: exercisesLoading, source } = useExercises();
+  const sound = useSound();
+
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [selectedExercises, setSelectedExercises] = useState(exercises.slice(0, 3));
+  const [selectedExercises, setSelectedExercises] = useState<Exercise[]>([]);
 
+  // Pick exercises to fill the break duration
   useEffect(() => {
+    if (allExercises.length === 0) return;
+
     const totalSecs = breakDuration * 60;
-    const shuffled = [...exercises].sort(() => Math.random() - 0.5);
-    const selected = [];
+    const shuffled = [...allExercises].sort(() => Math.random() - 0.5);
+    const selected: Exercise[] = [];
     let accumulated = 0;
+
     for (const ex of shuffled) {
       if (accumulated + ex.duration <= totalSecs || selected.length === 0) {
         selected.push(ex);
@@ -31,18 +41,27 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
         if (accumulated >= totalSecs) break;
       }
     }
-    setSelectedExercises(selected.length > 0 ? selected : shuffled.slice(0, 2));
+
+    setSelectedExercises(selected.length > 0 ? selected : shuffled.slice(0, 3));
     setCurrentExerciseIndex(0);
     setCurrentTime(0);
     setIsPlaying(true);
-  }, [breakDuration]);
+  }, [allExercises, breakDuration]);
 
   const currentExercise = selectedExercises[currentExerciseIndex];
 
-  useEffect(() => { setCurrentTime(0); }, [currentExerciseIndex]);
+  // Reset timer when exercise changes + play transition sound
+  useEffect(() => {
+    setCurrentTime(0);
+    if (currentExerciseIndex > 0) {
+      sound.playExerciseTransition();
+    }
+  }, [currentExerciseIndex]);
 
+  // Countdown
   useEffect(() => {
     if (!isPlaying || !currentExercise) return;
+
     const interval = setInterval(() => {
       setCurrentTime((prev) => {
         const next = prev + 1;
@@ -56,18 +75,24 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
         return next;
       });
     }, 1000);
+
     return () => clearInterval(interval);
   }, [isPlaying, currentExercise, currentExerciseIndex, selectedExercises.length]);
 
+  // Auto-complete when last exercise finishes
   useEffect(() => {
     if (!currentExercise) return;
     const isLast = currentExerciseIndex === selectedExercises.length - 1;
     if (isLast && currentTime >= currentExercise.duration) {
-      const timeout = setTimeout(() => onComplete(), 800);
+      const timeout = setTimeout(() => {
+        sound.playCompletion();
+        onComplete();
+      }, 600);
       return () => clearTimeout(timeout);
     }
   }, [currentTime, currentExercise, currentExerciseIndex, selectedExercises.length, onComplete]);
 
+  // Space = pause/resume
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.code === "Space") { e.preventDefault(); setIsPlaying((p) => !p); }
@@ -77,6 +102,7 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
   }, []);
 
   const handlePlayPause = useCallback(() => setIsPlaying((p) => !p), []);
+
   const handleSkip = useCallback(() => {
     if (currentExerciseIndex < selectedExercises.length - 1) {
       setCurrentExerciseIndex((i) => i + 1);
@@ -84,12 +110,30 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
     }
   }, [currentExerciseIndex, selectedExercises.length]);
 
-  if (!currentExercise) return null;
+  // Show loading while exercises fetch
+  if (exercisesLoading || selectedExercises.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center gap-4"
+      >
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">{t.breakScreen.title}...</p>
+      </motion.div>
+    );
+  }
 
-  const exTrans = exerciseTranslations[currentExercise.id as keyof typeof exerciseTranslations];
-  const translatedExercise = exTrans
+  // Apply i18n only for built-in exercises (API exercises are already in English)
+  const exTrans = source === "api" || source === "cache"
+    ? null
+    : exerciseTranslations[currentExercise?.id as keyof typeof exerciseTranslations];
+  const translatedExercise = exTrans && currentExercise
     ? { ...currentExercise, name: exTrans.name, description: exTrans.description }
     : currentExercise;
+
+  if (!translatedExercise) return null;
 
   return (
     <motion.div
@@ -98,11 +142,16 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-background z-50 flex flex-col"
     >
-      {/* ── TOP BAR ── */}
-      <div className="flex items-center justify-between px-8 pt-6 pb-4 border-b border-border/40">
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-8 pt-6 pb-4 border-b border-border/40 shrink-0">
         <div>
           <h1 className="text-xl font-semibold text-foreground">{t.breakScreen.title} 🧘</h1>
-          <p className="text-sm text-muted-foreground">{t.breakScreen.subtitle}</p>
+          <p className="text-sm text-muted-foreground">
+            {t.breakScreen.subtitle}
+            {source === "api" && (
+              <span className="ml-2 text-xs text-primary/60">· ExerciseDB</span>
+            )}
+          </p>
         </div>
 
         {/* Progress dots */}
@@ -110,8 +159,8 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
           {selectedExercises.map((_, idx) => (
             <div
               key={idx}
-              className={`h-2 rounded-full transition-all duration-400 ${
-                idx < currentExerciseIndex ? "w-2 bg-primary/60" :
+              className={`h-2 rounded-full transition-all duration-300 ${
+                idx < currentExerciseIndex  ? "w-2 bg-primary/50" :
                 idx === currentExerciseIndex ? "w-8 bg-primary" : "w-2 bg-muted"
               }`}
             />
@@ -119,8 +168,8 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
         </div>
       </div>
 
-      {/* ── MAIN CONTENT — full height ── */}
-      <div className="flex-1 flex items-center justify-center px-6 py-4 overflow-hidden">
+      {/* Main content */}
+      <div className="flex-1 flex items-center justify-center px-6 py-4 overflow-hidden min-h-0">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentExercise.id}
@@ -136,7 +185,7 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
               isPlaying={isPlaying}
               onPlayPause={handlePlayPause}
               onSkip={handleSkip}
-              onComplete={onComplete}
+              onComplete={() => { sound.playCompletion(); onComplete(); }}
               isLast={currentExerciseIndex === selectedExercises.length - 1}
               exerciseIndex={currentExerciseIndex}
               totalExercises={selectedExercises.length}
@@ -146,8 +195,8 @@ export function BreakScreen({ breakDuration, onComplete, t, exerciseTranslations
         </AnimatePresence>
       </div>
 
-      {/* ── BOTTOM HINT ── */}
-      <div className="text-center pb-4">
+      {/* Bottom hint */}
+      <div className="text-center pb-4 shrink-0">
         <p className="text-xs text-muted-foreground">
           <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Space</kbd>{" "}
           {t.breakScreen.spaceHint}

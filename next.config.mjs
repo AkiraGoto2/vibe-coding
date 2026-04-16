@@ -12,6 +12,9 @@ const nextConfig = {
       { protocol: "https", hostname: "media2.giphy.com" },
       { protocol: "https", hostname: "media3.giphy.com" },
       { protocol: "https", hostname: "media4.giphy.com" },
+      // ExerciseDB GIFs
+      { protocol: "https", hostname: "v2.exercisedb.io" },
+      { protocol: "https", hostname: "exercisedb.io" },
     ],
   },
 }

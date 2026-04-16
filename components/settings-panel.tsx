@@ -6,14 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
+  Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger,
 } from "@/components/ui/sheet";
-import { Settings, Globe, Sun, Moon, Monitor } from "lucide-react";
+import { Settings, Globe, Sun, Moon, Monitor, Volume2, VolumeX } from "lucide-react";
 import { Language, Translations } from "@/lib/i18n";
 import { useTheme } from "next-themes";
 
@@ -27,31 +22,34 @@ interface SettingsPanelProps {
   language: Language;
   onLanguageChange: (lang: Language) => void;
   t: Translations;
+  sound?: { setEnabled: (v: boolean) => void; isEnabled: () => boolean };
 }
 
 export function SettingsPanel({
-  workDuration,
-  breakDuration,
-  onWorkDurationChange,
-  onBreakDurationChange,
-  autostart,
-  onAutostartChange,
-  language,
-  onLanguageChange,
-  t,
+  workDuration, breakDuration,
+  onWorkDurationChange, onBreakDurationChange,
+  autostart, onAutostartChange,
+  language, onLanguageChange,
+  t, sound,
 }: SettingsPanelProps) {
   const [localWork, setLocalWork] = useState(workDuration);
   const [localBreak, setLocalBreak] = useState(breakDuration);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => { setLocalWork(workDuration); }, [workDuration]);
   useEffect(() => { setLocalBreak(breakDuration); }, [breakDuration]);
 
+  const handleSoundToggle = (v: boolean) => {
+    setSoundEnabled(v);
+    sound?.setEnabled(v);
+  };
+
   const s = t.settings;
 
   const themeOptions = [
-    { value: "light", label: s.themeLight, icon: Sun },
-    { value: "dark", label: s.themeDark, icon: Moon },
+    { value: "light",  label: s.themeLight,  icon: Sun },
+    { value: "dark",   label: s.themeDark,   icon: Moon },
     { value: "system", label: s.themeSystem, icon: Monitor },
   ] as const;
 
@@ -73,11 +71,8 @@ export function SettingsPanel({
 
           {/* ── TIMERS ── */}
           <section>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
-              Timer
-            </h3>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">Timer</h3>
 
-            {/* Work Duration */}
             <div className="space-y-3 mb-5">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">{s.workDuration}</Label>
@@ -85,23 +80,15 @@ export function SettingsPanel({
                   {localWork} {s.minutes}
                 </span>
               </div>
-              <Slider
-                min={15}
-                max={120}
-                step={5}
-                value={[localWork]}
+              <Slider min={15} max={120} step={5} value={[localWork]}
                 onValueChange={(v) => setLocalWork(v[0])}
-                onValueCommit={(v) => onWorkDurationChange(v[0])}
-                className="w-full"
-              />
+                onValueCommit={(v) => onWorkDurationChange(v[0])} />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>15 {s.minutes}</span>
-                <span>120 {s.minutes}</span>
+                <span>15 {s.minutes}</span><span>120 {s.minutes}</span>
               </div>
               <p className="text-xs text-muted-foreground">{s.workHint}</p>
             </div>
 
-            {/* Break Duration */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">{s.breakDuration}</Label>
@@ -109,18 +96,11 @@ export function SettingsPanel({
                   {localBreak} {s.minutes}
                 </span>
               </div>
-              <Slider
-                min={2}
-                max={30}
-                step={1}
-                value={[localBreak]}
+              <Slider min={2} max={30} step={1} value={[localBreak]}
                 onValueChange={(v) => setLocalBreak(v[0])}
-                onValueCommit={(v) => onBreakDurationChange(v[0])}
-                className="w-full"
-              />
+                onValueCommit={(v) => onBreakDurationChange(v[0])} />
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>2 {s.minutes}</span>
-                <span>30 {s.minutes}</span>
+                <span>2 {s.minutes}</span><span>30 {s.minutes}</span>
               </div>
               <p className="text-xs text-muted-foreground">{s.breakHint}</p>
             </div>
@@ -130,20 +110,15 @@ export function SettingsPanel({
 
           {/* ── APPEARANCE ── */}
           <section>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
-              {s.theme}
-            </h3>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">{s.theme}</h3>
             <div className="grid grid-cols-3 gap-2">
               {themeOptions.map(({ value, label, icon: Icon }) => (
-                <button
-                  key={value}
-                  onClick={() => setTheme(value)}
+                <button key={value} onClick={() => setTheme(value)}
                   className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border text-xs font-medium transition-all ${
                     theme === value
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border hover:border-border/80 hover:bg-muted/50 text-muted-foreground"
-                  }`}
-                >
+                  }`}>
                   <Icon className="h-4 w-4" />
                   {label}
                 </button>
@@ -156,20 +131,16 @@ export function SettingsPanel({
           {/* ── LANGUAGE ── */}
           <section>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
-              <Globe className="inline h-3 w-3 mr-1" />
-              {s.language}
+              <Globe className="inline h-3 w-3 mr-1" />{s.language}
             </h3>
             <div className="grid grid-cols-2 gap-2">
               {(["en", "ru"] as Language[]).map((lang) => (
-                <button
-                  key={lang}
-                  onClick={() => onLanguageChange(lang)}
+                <button key={lang} onClick={() => onLanguageChange(lang)}
                   className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border text-sm font-medium transition-all ${
                     language === lang
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border hover:border-border/80 hover:bg-muted/50 text-muted-foreground"
-                  }`}
-                >
+                  }`}>
                   <span>{lang === "en" ? "🇬🇧" : "🇷🇺"}</span>
                   {lang === "en" ? "English" : "Русский"}
                 </button>
@@ -180,16 +151,34 @@ export function SettingsPanel({
           <div className="h-px bg-border" />
 
           {/* ── SYSTEM ── */}
-          <section>
+          <section className="space-y-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">System</h3>
+
+            {/* Sound toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {soundEnabled
+                  ? <Volume2 className="w-4 h-4 text-muted-foreground" />
+                  : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+                <div>
+                  <Label className="text-sm font-medium">
+                    {language === "ru" ? "Звуки таймера" : "Timer sounds"}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {language === "ru" ? "Звуковые сигналы при перерыве" : "Audio cues at break time"}
+                  </p>
+                </div>
+              </div>
+              <Switch checked={soundEnabled} onCheckedChange={handleSoundToggle} />
+            </div>
+
+            {/* Autostart */}
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-sm font-medium">{s.autostart}</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">{s.autostartHint}</p>
               </div>
-              <Switch
-                checked={autostart}
-                onCheckedChange={onAutostartChange}
-              />
+              <Switch checked={autostart} onCheckedChange={onAutostartChange} />
             </div>
           </section>
 

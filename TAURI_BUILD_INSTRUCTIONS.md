@@ -1,114 +1,167 @@
-# Break Reminder - Tauri Desktop App
+# Сборка десктопного приложения (Tauri)
 
-Desktop application that reminds you to take exercise breaks every 60 minutes.
+## Как это работает
 
-## Features
+Tauri оборачивает ваш Next.js-сайт в нативное окно приложения. Next.js работает как локальный сервер, Rust-бэкенд управляет окном, треем и уведомлениями.
 
-- 60-minute work timer (configurable 15-120 minutes)
-- Fullscreen break mode with exercise videos
-- 12 different exercises with video guides
-- System tray support
-- Auto-start with system boot
-- Keyboard shortcuts (Space to pause/resume)
+---
 
-## Prerequisites
+## Шаг 1 — Установите Rust
 
-1. **Rust** - Install from [rustup.rs](https://rustup.rs/)
-2. **Node.js** - Version 18+ recommended
-3. **pnpm** - Install with `npm install -g pnpm`
-4. **Tauri CLI** - Install with `cargo install tauri-cli`
-
-### Windows Additional Requirements
-- Microsoft Visual Studio C++ Build Tools
-- WebView2 (usually pre-installed on Windows 10/11)
-
-## Project Structure
-
-```
-/
-├── app/                    # Next.js frontend
-├── components/             # React components
-├── hooks/                  # React hooks (including Tauri integration)
-├── lib/                    # Utilities and exercise data
-├── src-tauri/              # Tauri/Rust backend
-│   ├── src/
-│   │   ├── main.rs         # App entry point
-│   │   ├── commands.rs     # Tauri commands
-│   │   └── tray.rs         # System tray setup
-│   ├── Cargo.toml          # Rust dependencies
-│   └── tauri.conf.json     # Tauri configuration
-└── package.json            # Node.js dependencies
+**macOS / Linux:**
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
 ```
 
-## Installation
+**Windows:**  
+Скачайте `rustup-init.exe` с https://rustup.rs и запустите.
 
-1. Clone the project and install dependencies:
+Проверка:
+```bash
+rustc --version   # должно вывести: rustc 1.7x.x
+cargo --version
+```
+
+---
+
+## Шаг 2 — Системные зависимости
+
+### macOS
+```bash
+xcode-select --install
+```
+
+### Windows
+1. Установите [Visual Studio Build Tools 2022](https://visualstudio.microsoft.com/visual-cpp-build-tools/)  
+   → Выберите компонент: **"Desktop development with C++"**
+2. WebView2 уже встроен в Windows 10/11. Если нет — скачайте с [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/)
+
+### Linux (Ubuntu/Debian)
+```bash
+sudo apt update
+sudo apt install -y \
+  libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+  patchelf libssl-dev libgtk-3-dev
+```
+
+---
+
+## Шаг 3 — Установите Node.js зависимости и базу данных
+
 ```bash
 pnpm install
+pnpm db:setup
 ```
 
-2. Run in development mode:
+---
+
+## Шаг 4 — Запуск в режиме разработки
+
 ```bash
 pnpm tauri dev
 ```
 
-3. Build for production:
+Это запустит:
+1. `next dev` — Next.js сервер на порту 3000
+2. Tauri — нативное окно, которое загружает `http://localhost:3000`
+
+⚠️ Первая сборка Rust занимает 3–5 минут (компилируются зависимости). Последующие — 10–30 секунд.
+
+---
+
+## Шаг 5 — Создание иконок (обязательно перед build)
+
+Папка `src-tauri/icons/` должна содержать иконки. Создайте их из `public/icon.svg`:
+
+```bash
+# Установите tauri-cli если ещё нет:
+cargo install tauri-cli
+
+# Автогенерация всех размеров иконок из PNG 1024x1024:
+cargo tauri icon public/apple-icon.png
+```
+
+Это создаст `src-tauri/icons/` с нужными размерами.
+
+---
+
+## Шаг 6 — Продакшен сборка
+
 ```bash
 pnpm tauri build
 ```
 
-The built application will be in `src-tauri/target/release/bundle/`
+Готовые файлы в `src-tauri/target/release/bundle/`:
+- **Windows:** `msi/` и `nsis/` (установщики)
+- **macOS:** `dmg/` и `macos/` (`.app`)
+- **Linux:** `appimage/` и `deb/`
 
-## Configuration
+---
 
-### Timer Settings
-- **Work Duration**: 15-120 minutes (default: 60)
-- **Break Duration**: 5-30 minutes (default: 10)
+## Важное ограничение: Next.js режим
 
-### Auto-Start
-Enable "Start with System" in settings to automatically launch on boot.
+Tauri использует статический экспорт Next.js. В `tauri.conf.json` указан `"frontendDist": "../out"`, значит **перед `pnpm tauri build`** нужен `pnpm build` который генерирует папку `out/`.
 
-## Keyboard Shortcuts
+Но наш проект использует **API Routes** (авторизация, БД) — они не работают в статическом режиме.
 
-| Key | Action |
-|-----|--------|
-| Space | Pause/Resume timer |
+### Решение для продакшена:
 
-## Customizing Exercises
+**Вариант A — Только фронтенд в Tauri (рекомендуется):**  
+Запускайте `next start` отдельно (или как системный сервис), а Tauri просто открывает окно браузера на нужный URL.
 
-Edit `lib/exercises.ts` to add or modify exercises. Each exercise has:
-- `id`: Unique identifier
-- `name`: Display name
-- `description`: Instructions
-- `duration`: Time in seconds
-- `videoUrl`: YouTube embed URL
-- `category`: "stretch", "strength", "cardio", or "relax"
-
-## Troubleshooting
-
-### Build fails on Windows
-Make sure you have Visual Studio Build Tools installed with "Desktop development with C++".
-
-### WebView2 not found
-Download and install WebView2 Runtime from Microsoft.
-
-### Timer not working
-Check if the app has necessary permissions in Windows Security settings.
-
-## Package Scripts
-
-Add these to your `package.json`:
-
+Измените `tauri.conf.json`:
 ```json
-{
-  "scripts": {
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
-  }
+"build": {
+  "devUrl": "http://localhost:3000",
+  "frontendDist": "http://localhost:3000"
 }
 ```
 
-## License
+**Вариант B — Sidecar сервер:**  
+Запаковать `next start` как sidecar в Tauri bundle. Это сложнее, но даёт полностью автономное приложение.
 
-MIT
+**Вариант C (для разработки):**  
+Всегда использовать `pnpm tauri dev` — Next.js и Tauri запускаются вместе.
+
+---
+
+## Диагностика ошибок
+
+| Ошибка | Решение |
+|--------|---------|
+| `error: linker 'cc' not found` | Linux: `sudo apt install gcc` |
+| `WebView2 not found` | Windows: установите WebView2 Runtime |
+| `icons not found` | Запустите `cargo tauri icon <png>` |
+| `Cannot connect to database` | Запустите `pnpm db:setup` перед сборкой |
+| `Port 3000 in use` | `pnpm tauri dev` сам управляет портом |
+| Первая сборка очень долгая | Нормально, Rust компилирует зависимости |
+
+---
+
+## Структура Tauri-бэкенда
+
+```
+src-tauri/
+  src/
+    main.rs       — точка входа, регистрация плагинов
+    commands.rs   — Tauri команды (таймер, уведомления)
+    tray.rs       — системный трей
+  Cargo.toml      — Rust зависимости
+  tauri.conf.json — конфигурация окна, иконок, bundle
+```
+
+## Доступные Tauri команды
+
+| Команда | Описание |
+|---------|----------|
+| `get_timer_state` | Получить состояние таймера |
+| `start_timer` / `pause_timer` | Управление таймером |
+| `reset_timer` | Сброс таймера |
+| `set_work_duration` | Установить длительность работы |
+| `set_break_duration` | Установить длительность перерыва |
+| `show_break_window` | Развернуть окно на весь экран |
+| `hide_break_window` | Вернуть нормальный размер |
+| `complete_break` | Завершить перерыв |
+| `toggle_autostart` | Вкл/выкл автозапуск |
+| `send_notification` | Системное уведомление |

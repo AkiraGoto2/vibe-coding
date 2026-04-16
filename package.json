@@ -10,7 +10,9 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "make-admin": "tsx scripts/make-admin.ts"
+    "make-admin": "tsx scripts/make-admin.ts",
+    "db:setup": "prisma generate && prisma db push",
+    "setup": "pnpm install && pnpm db:setup"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

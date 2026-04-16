@@ -11,20 +11,23 @@ import { FeedbackModal } from "@/components/feedback-modal";
 import { useTimer, useAutostart } from "@/hooks/use-tauri";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth } from "@/hooks/use-auth";
+import { useSound } from "@/hooks/use-sound";
 import {
   Play, Pause, RotateCcw, Timer, Activity,
-  UserCircle2, LogOut, MessageSquare, CheckCircle2, ShieldCheck,
+  UserCircle2, LogOut, MessageSquare, CheckCircle2,
+  ShieldCheck,
 } from "lucide-react";
-import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   DropdownMenu, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 
 export default function Home() {
   const { t, language, changeLanguage } = useLanguage();
   const { user, loading: authLoading, logout, isAdmin } = useAuth();
+  const sound = useSound();
 
   const {
     timerState, startTimer, pauseTimer, resetTimer,
@@ -33,9 +36,11 @@ export default function Home() {
   } = useTimer();
 
   const { enabled: autostartEnabled, toggle: toggleAutostart } = useAutostart();
-
   const [authOpen, setAuthOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+
+  // Track previous remaining_seconds to detect the exact 0 crossing
+  const prevRemaining = useState(timerState.remaining_seconds)[0];
 
   // Sync settings from DB when user logs in
   useEffect(() => {
@@ -46,7 +51,7 @@ export default function Home() {
     if (s.language)      changeLanguage(s.language as "en" | "ru");
   }, [user]);
 
-  // Persist settings to DB when they change
+  // Persist settings to DB (debounced)
   useEffect(() => {
     if (!user) return;
     const timer = setTimeout(() => {
@@ -59,18 +64,25 @@ export default function Home() {
           language,
         }),
       }).catch(() => {});
-    }, 1000); // debounce
+    }, 1000);
     return () => clearTimeout(timer);
   }, [timerState.work_duration, timerState.break_duration, language, user]);
 
-  // Auto-trigger break when timer hits 0
+  // Auto-trigger break when timer hits 0 + play sound
   useEffect(() => {
     if (timerState.remaining_seconds === 0 && !timerState.is_break_time) {
+      sound.playWorkEnd();
       showBreakWindow();
     }
-  }, [timerState.remaining_seconds, timerState.is_break_time, showBreakWindow]);
+  }, [timerState.remaining_seconds, timerState.is_break_time]);
 
-  // Space shortcut (main screen only)
+  // Play sound when break completes and timer restarts
+  const handleCompleteBreak = useCallback(async () => {
+    sound.playBreakEnd();
+    await completeBreak();
+  }, [completeBreak]);
+
+  // Space shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.code === "Space" && !timerState.is_break_time) {
@@ -88,30 +100,25 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
-
-      {/* ── BREAK SCREEN ── */}
       <AnimatePresence>
         {timerState.is_break_time && (
           <BreakScreen
             breakDuration={timerState.break_duration}
-            onComplete={completeBreak}
+            onComplete={handleCompleteBreak}
             t={t}
             exerciseTranslations={t.exercises}
           />
         )}
       </AnimatePresence>
 
-      {/* ── MAIN UI ── */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
         className="flex-1 flex flex-col items-center justify-center p-6"
       >
-        {/* ─ Header ─ */}
+        {/* Header */}
         <div className="absolute top-5 left-5 right-5 flex items-center justify-between">
-
-          {/* Logo */}
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm">
               <Activity className="w-4 h-4 text-primary-foreground" />
@@ -124,10 +131,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right controls */}
           <div className="flex items-center gap-1.5">
-
-            {/* Feedback button */}
             <Button
               variant="ghost" size="sm"
               onClick={() => setFeedbackOpen(true)}
@@ -137,7 +141,6 @@ export default function Home() {
               {t.feedback.feedbackBtn}
             </Button>
 
-            {/* User menu */}
             {authLoading ? null : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -187,7 +190,6 @@ export default function Home() {
               </Button>
             )}
 
-            {/* Settings */}
             <SettingsPanel
               workDuration={timerState.work_duration}
               breakDuration={timerState.break_duration}
@@ -198,11 +200,12 @@ export default function Home() {
               language={language}
               onLanguageChange={changeLanguage}
               t={t}
+              sound={sound}
             />
           </div>
         </div>
 
-        {/* ─ Timer ─ */}
+        {/* Timer */}
         <TimerDisplay
           remainingSeconds={timerState.remaining_seconds}
           isRunning={timerState.is_running}
@@ -210,7 +213,7 @@ export default function Home() {
           t={t}
         />
 
-        {/* ─ Controls ─ */}
+        {/* Controls */}
         <div className="flex items-center gap-4 mt-7">
           <Button
             variant="outline" size="icon"
@@ -241,7 +244,7 @@ export default function Home() {
           </Button>
         </div>
 
-        {/* ─ Stats cards ─ */}
+        {/* Stats */}
         <div className="grid grid-cols-2 gap-3 mt-10 w-full max-w-xs">
           <Card className="bg-card/60 border-border/50">
             <CardContent className="p-4">
@@ -263,7 +266,6 @@ export default function Home() {
           </Card>
         </div>
 
-        {/* ─ Hint ─ */}
         <p className="mt-7 text-xs text-muted-foreground">
           {t.pressSpace}{" "}
           <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Space</kbd>{" "}
@@ -271,7 +273,6 @@ export default function Home() {
         </p>
       </motion.div>
 
-      {/* ── MODALS ── */}
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} t={t} />
       <FeedbackModal
         open={feedbackOpen}
