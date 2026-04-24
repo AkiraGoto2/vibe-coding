@@ -3,13 +3,19 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createSession } from "@/lib/auth";
 import { loginSchema } from "@/lib/validations";
+import { checkRateLimit, authRatelimit } from "@/lib/ratelimit";
+import { logger } from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for") ?? "unknown";
+
   try {
-    const body = await req.json().catch(() => null);
-    if (!body) {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    if (await checkRateLimit(authRatelimit, `login:${ip}`)) {
+      return NextResponse.json({ error: "Too many attempts. Try again in 15 minutes." }, { status: 429 });
     }
+
+    const body = await req.json().catch(() => null);
+    if (!body) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
 
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {
@@ -18,42 +24,50 @@ export async function POST(req: NextRequest) {
 
     const { email, password } = parsed.data;
 
-    // Test DB connection first
-    await db.$queryRaw`SELECT 1`.catch(() => {
-      throw new Error("DATABASE_NOT_INITIALIZED");
-    });
+    // Test DB
+    try {
+      await db.$queryRaw`SELECT 1`;
+    } catch (dbErr) {
+      const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+      logger.error({ dbErr }, "DB connection test failed in login");
+      return NextResponse.json(
+        {
+          error: process.env.NODE_ENV !== "production"
+            ? `DB error: ${msg}`
+            : "Database unavailable.",
+        },
+        { status: 503 }
+      );
+    }
 
     const user = await db.user.findUnique({ where: { email } });
 
-    // Constant-time check prevents email enumeration timing attacks
-    const dummyHash = "$2b$12$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-    const hash = user?.passwordHash ?? dummyHash;
-    const match = await bcrypt.compare(password, hash);
+    const DUMMY_HASH = "$2b$12$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const match = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
 
     if (!user || !match) {
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    }
+
+    if (!user.emailVerified) {
       return NextResponse.json(
-        { error: "Неверный email или пароль / Invalid email or password" },
-        { status: 401 }
+        { error: "Email not verified", requiresVerification: true, email },
+        { status: 403 }
       );
     }
 
     await createSession(user.id, user.email, user.name, user.role);
+    logger.info({ email }, "User logged in");
 
     return NextResponse.json({
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-
-    if (msg === "DATABASE_NOT_INITIALIZED") {
-      return NextResponse.json(
-        { error: "База данных не инициализирована. Запустите: pnpm db:setup" },
-        { status: 503 }
-      );
-    }
-
-    const detail = process.env.NODE_ENV !== "production" ? ` (${msg})` : "";
-    console.error("[login]", err);
-    return NextResponse.json({ error: `Server error${detail}` }, { status: 500 });
+    logger.error({ err, ip }, "Login error");
+    return NextResponse.json(
+      { error: process.env.NODE_ENV !== "production" ? `Server error: ${msg}` : "Server error" },
+      { status: 500 }
+    );
   }
 }

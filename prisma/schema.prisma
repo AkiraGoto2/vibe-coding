@@ -1,23 +1,28 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id            String       @id @default(cuid())
-  email         String       @unique
+  id            String        @id @default(cuid())
+  email         String        @unique
   name          String
   passwordHash  String
-  role          String       @default("USER")   // "USER" | "ADMIN"
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  role          String        @default("USER")
+  emailVerified Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   settings      UserSettings?
   feedback      Feedback[]
   sessions      Session[]
+
+  @@index([email])
 }
 
 model UserSettings {
@@ -27,8 +32,8 @@ model UserSettings {
   breakDuration Int      @default(5)
   language      String   @default("en")
   autostart     Boolean  @default(false)
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Session {
@@ -38,6 +43,21 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Verification codes for email confirmation
+model VerificationCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, code])
 }
 
 model Feedback {
@@ -47,7 +67,27 @@ model Feedback {
   email     String
   subject   String
   message   String
-  status    String   @default("new")   // "new" | "read" | "resolved"
+  status    String   @default("new")
   createdAt DateTime @default(now())
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Custom exercises editable by admins
+model Exercise {
+  id          String   @id @default(cuid())
+  name        String
+  nameRu      String   @default("")
+  description String
+  descriptionRu String @default("")
+  gifUrl      String
+  category    String   @default("stretch")
+  duration    Int      @default(45)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
 }

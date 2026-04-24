@@ -12,11 +12,25 @@ const nextConfig = {
       { protocol: "https", hostname: "media2.giphy.com" },
       { protocol: "https", hostname: "media3.giphy.com" },
       { protocol: "https", hostname: "media4.giphy.com" },
-      // ExerciseDB GIFs
       { protocol: "https", hostname: "v2.exercisedb.io" },
-      { protocol: "https", hostname: "exercisedb.io" },
     ],
   },
-}
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+      {
+        source: "/api/gif",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400" }],
+      },
+    ];
+  },
+};
 
-export default nextConfig
+export default nextConfig;

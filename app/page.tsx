@@ -107,6 +107,7 @@ export default function Home() {
             onComplete={handleCompleteBreak}
             t={t}
             exerciseTranslations={t.exercises}
+            language={language}
           />
         )}
       </AnimatePresence>

@@ -47,6 +47,12 @@ export const translations = {
       profile: "Profile",
       guest: "Guest",
       syncSettings: "Settings sync enabled",
+      verifyTitle: "Check your email",
+      verifyDesc: "We sent a 6-digit code to",
+      verifyCode: "Verification code",
+      verifyBtn: "Verify & Sign In",
+      resend: "Resend code",
+      resendIn: "Resend in",
     },
     feedback: {
       title: "Feedback",
@@ -73,6 +79,7 @@ export const translations = {
       exercise: "Exercise",
       of: "of",
       spaceHint: "to pause/resume",
+      loadingExercises: "Loading exercises...",
     },
     exerciseCard: {
       complete: "Complete Break",
@@ -139,6 +146,12 @@ export const translations = {
       profile: "Профиль",
       guest: "Гость",
       syncSettings: "Настройки синхронизируются с аккаунтом",
+      verifyTitle: "Проверьте почту",
+      verifyDesc: "Мы отправили 6-значный код на",
+      verifyCode: "Код подтверждения",
+      verifyBtn: "Подтвердить и войти",
+      resend: "Отправить снова",
+      resendIn: "Повторно через",
     },
     feedback: {
       title: "Обратная связь",
@@ -165,6 +178,7 @@ export const translations = {
       exercise: "Упражнение",
       of: "из",
       spaceHint: "— остановить или продолжить",
+      loadingExercises: "Загружаем упражнения...",
     },
     exerciseCard: {
       complete: "Завершить перерыв",

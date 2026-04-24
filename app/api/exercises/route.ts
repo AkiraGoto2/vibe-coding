@@ -1,152 +1,130 @@
 import { NextResponse } from "next/server";
 
-// Office-friendly body parts from ExerciseDB
-// We target muscles that can be exercised at/near a desk
-const OFFICE_BODY_PARTS = [
-  "neck",
-  "upper arms",
-  "upper legs",
-  "waist",
-  "back",
-  "shoulders",
-  "chest",
-  "cardio",
-] as const;
+export const dynamic = "force-dynamic";
 
-// Exercises that work at a desk (by equipment type)
-const OFFICE_EQUIPMENT = [
-  "body weight",
-  "band",
-] as const;
-
-// Cache in-memory for the process lifetime so we don't hammer the API
-let cachedExercises: OfficeExercise[] | null = null;
-let cacheTime = 0;
-const CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
-
-export interface OfficeExercise {
-  id: string;
-  name: string;
-  gifUrl: string;
-  target: string;       // primary muscle
-  bodyPart: string;
-  equipment: string;
-  instructions: string[];
-  category: "stretch" | "strength" | "cardio" | "relax";
-  duration: number;     // seconds — we derive this from the exercise type
-}
-
-function deriveCategory(bodyPart: string, equipment: string, name: string): OfficeExercise["category"] {
-  const lc = name.toLowerCase();
-  if (lc.includes("stretch") || lc.includes("rotation") || lc.includes("roll") || lc.includes("tilt") || lc.includes("twist") || lc.includes("flexion") || bodyPart === "neck") return "stretch";
-  if (lc.includes("cardio") || lc.includes("march") || lc.includes("jumping") || bodyPart === "cardio") return "cardio";
-  if (lc.includes("relax") || lc.includes("breath") || lc.includes("meditation")) return "relax";
-  return "strength";
-}
-
-function deriveDuration(category: OfficeExercise["category"]): number {
-  switch (category) {
-    case "stretch": return 45;
-    case "strength": return 60;
-    case "cardio": return 60;
-    case "relax": return 30;
-  }
-}
-
-async function fetchExercisesFromAPI(): Promise<OfficeExercise[]> {
-  const apiKey = process.env.EXERCISEDB_API_KEY;
-  if (!apiKey || apiKey === "your-rapidapi-key-here") {
-    throw new Error("EXERCISEDB_API_KEY not configured");
-  }
-
-  const headers = {
-    "X-RapidAPI-Key": apiKey,
-    "X-RapidAPI-Host": "exercisedb.p.rapidapi.com",
-  };
-
-  // Fetch exercises for each office-friendly body part in parallel
-  const results = await Promise.allSettled(
-    OFFICE_BODY_PARTS.map((part) =>
-      fetch(
-        `https://exercisedb.p.rapidapi.com/exercises/bodyPart/${encodeURIComponent(part)}?limit=50&offset=0`,
-        { headers }
-      ).then((r) => r.json())
-    )
-  );
-
-  const allExercises: OfficeExercise[] = [];
-
-  for (const result of results) {
-    if (result.status !== "fulfilled") continue;
-    const data = result.value;
-    if (!Array.isArray(data)) continue;
-
-    for (const ex of data) {
-      // Only body weight or band exercises — no machines, barbells, etc.
-      if (!OFFICE_EQUIPMENT.includes(ex.equipment)) continue;
-
-      // Skip exercises that clearly require lying on floor (not desk-friendly)
-      const nameLower = (ex.name as string).toLowerCase();
-      const skipKeywords = ["lying", "floor", "push-up", "pushup", "pull-up", "pullup", "plank", "sit-up", "situp", "crunch", "lunge", "squat jump", "burpee", "handstand"];
-      if (skipKeywords.some((kw) => nameLower.includes(kw))) continue;
-
-      const category = deriveCategory(ex.bodyPart, ex.equipment, ex.name);
-      const duration = deriveDuration(category);
-
-      allExercises.push({
-        id: ex.id,
-        name: ex.name
-          .split(" ")
-          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" "),
-        gifUrl: ex.gifUrl,
-        target: ex.target,
-        bodyPart: ex.bodyPart,
-        equipment: ex.equipment,
-        instructions: ex.instructions ?? [],
-        category,
-        duration,
-      });
-    }
-  }
-
-  // Remove duplicates by id
-  const unique = Array.from(new Map(allExercises.map((e) => [e.id, e])).values());
-
-  // Shuffle so variety changes between sessions
-  return unique.sort(() => Math.random() - 0.5);
-}
+// Curated office-friendly exercises with reliable Giphy GIFs
+// These show real people performing the exercise
+const FALLBACK_EXERCISES = [
+  {
+    id: "neck-rolls",
+    name: "Neck Rolls",
+    nameRu: "Вращение шеи",
+    description: "Slowly roll your head in a full circle. Keep shoulders relaxed. 3 rotations each direction.",
+    descriptionRu: "Медленно вращайте головой по кругу. Плечи расслаблены. 3 круга в каждую сторону.",
+    gifUrl: "https://media.giphy.com/media/26BoEiQmzfg2rrkYg/giphy.gif",
+    category: "stretch",
+    duration: 45,
+  },
+  {
+    id: "shoulder-rolls",
+    name: "Shoulder Rolls",
+    nameRu: "Вращение плечами",
+    description: "Roll both shoulders backward in big circles, then forward. Releases upper back tension.",
+    descriptionRu: "Вращайте оба плеча назад большими кругами, затем вперёд. Снимает напряжение верхней части спины.",
+    gifUrl: "https://media.giphy.com/media/3oriO6qJiXajN0TyAU/giphy.gif",
+    category: "stretch",
+    duration: 40,
+  },
+  {
+    id: "wrist-stretch",
+    name: "Wrist Stretch",
+    nameRu: "Растяжка запястий",
+    description: "Extend arm forward, pull fingers back with other hand. Hold 15 sec each side.",
+    descriptionRu: "Вытяните руку, потяните пальцы назад другой рукой. Держите 15 сек на каждую сторону.",
+    gifUrl: "https://media.giphy.com/media/xT9IgG50Lg7russbDa/giphy.gif",
+    category: "stretch",
+    duration: 40,
+  },
+  {
+    id: "seated-twist",
+    name: "Seated Spinal Twist",
+    nameRu: "Скрутка сидя",
+    description: "Sit tall, right hand on left knee, twist left. Hold 20 sec, then switch sides.",
+    descriptionRu: "Сядьте прямо, правую руку на левое колено, повернитесь влево. 20 сек, смените сторону.",
+    gifUrl: "https://media.giphy.com/media/l0HlBO7eyXzSZkJri/giphy.gif",
+    category: "stretch",
+    duration: 50,
+  },
+  {
+    id: "overhead-stretch",
+    name: "Overhead Arm Stretch",
+    nameRu: "Растяжка рук вверх",
+    description: "Interlace fingers, push palms to ceiling, hold 10 sec. Stretches the entire upper body.",
+    descriptionRu: "Сцепите пальцы, потяните ладони вверх, держите 10 сек. Растягивает всё верхнее тело.",
+    gifUrl: "https://media.giphy.com/media/26BRv0ThflsHCqDrG/giphy.gif",
+    category: "stretch",
+    duration: 40,
+  },
+  {
+    id: "eye-focus",
+    name: "Eye Focus Exercise",
+    nameRu: "Упражнение для глаз",
+    description: "Focus on a distant object for 20 sec, then something close. Reduces eye strain (20-20-20 rule).",
+    descriptionRu: "Смотрите вдаль 20 сек, затем на близкий предмет. Снимает усталость глаз (правило 20-20-20).",
+    gifUrl: "https://media.giphy.com/media/d2lcHJTG5Tscg/giphy.gif",
+    category: "relax",
+    duration: 45,
+  },
+  {
+    id: "calf-raises",
+    name: "Seated Calf Raises",
+    nameRu: "Подъём на носки сидя",
+    description: "Sit with feet flat, raise heels off floor. Hold 2 sec, lower slowly. Repeat 15 times.",
+    descriptionRu: "Сидя с ровными ногами, поднимите пятки. Держите 2 сек, опустите медленно. 15 повторений.",
+    gifUrl: "https://media.giphy.com/media/3oriNYQX2lC6dfW2Ji/giphy.gif",
+    category: "strength",
+    duration: 50,
+  },
+  {
+    id: "standing-march",
+    name: "Standing March",
+    nameRu: "Марш на месте",
+    description: "Stand and march in place lifting knees to hip height. Swing arms naturally for 30 seconds.",
+    descriptionRu: "Встаньте и маршируйте на месте, поднимая колени до уровня бёдер. 30 секунд.",
+    gifUrl: "https://media.giphy.com/media/l46Cy1rHbQ92uuLXa/giphy.gif",
+    category: "cardio",
+    duration: 35,
+  },
+  {
+    id: "hip-flexor",
+    name: "Seated Hip Flexor",
+    nameRu: "Растяжка сгибателей бедра",
+    description: "Sit on edge of chair, extend right leg back, feel stretch in hip. Hold 20 sec each side.",
+    descriptionRu: "Сядьте на край стула, отведите правую ногу назад, почувствуйте растяжку. 20 сек на сторону.",
+    gifUrl: "https://media.giphy.com/media/3o7TKP9ln2Dr6ze6f6/giphy.gif",
+    category: "stretch",
+    duration: 50,
+  },
+  {
+    id: "box-breathing",
+    name: "Box Breathing",
+    nameRu: "Квадратное дыхание",
+    description: "Inhale 4 sec → hold 4 sec → exhale 4 sec → hold 4 sec. Repeat 3 times. Instant stress relief.",
+    descriptionRu: "Вдох 4 сек → задержка 4 сек → выдох 4 сек → задержка 4 сек. 3 повторения. Мгновенно снимает стресс.",
+    gifUrl: "https://media.giphy.com/media/dVuyBgq2z5gVBkFtDc/giphy.gif",
+    category: "relax",
+    duration: 55,
+  },
+];
 
 export async function GET() {
+  // Try to serve from DB (admin-managed exercises)
+  // Wrapped in try/catch so a DB error never breaks the break screen
   try {
-    const now = Date.now();
+    const { db } = await import("@/lib/db");
 
-    // Return cached data if fresh
-    if (cachedExercises && now - cacheTime < CACHE_TTL) {
-      return NextResponse.json({ exercises: cachedExercises, source: "cache" });
+    const dbExercises = await Promise.race([
+      db.exercise.findMany({ where: { isActive: true }, orderBy: { createdAt: "asc" } }),
+      // 3s timeout — if DB is slow, fall back to built-ins immediately
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+    ]).catch(() => [] as typeof dbExercises);
+
+    if (Array.isArray(dbExercises) && dbExercises.length > 0) {
+      return NextResponse.json({ exercises: dbExercises, source: "db" });
     }
-
-    const exercises = await fetchExercisesFromAPI();
-    cachedExercises = exercises;
-    cacheTime = now;
-
-    return NextResponse.json({ exercises, source: "api" });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-
-    // If API key not set, return the built-in fallback exercises
-    if (msg.includes("EXERCISEDB_API_KEY not configured")) {
-      return NextResponse.json({
-        exercises: [],
-        source: "no-api-key",
-        error: "ExerciseDB API key not configured. Add EXERCISEDB_API_KEY to .env",
-      });
-    }
-
-    console.error("[exercises api]", err);
-    return NextResponse.json(
-      { exercises: [], source: "error", error: msg },
-      { status: 500 }
-    );
+  } catch {
+    // DB not available — silently use fallback
   }
+
+  return NextResponse.json({ exercises: FALLBACK_EXERCISES, source: "fallback" });
 }
