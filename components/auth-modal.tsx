@@ -29,6 +29,7 @@ const registerSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(8, "Min 8 chars").regex(/[A-Z]/, "Needs uppercase").regex(/[0-9]/, "Needs a number"),
   confirmPassword: z.string(),
+  consent: z.boolean().refine(v => v === true, { message: "Необходимо принять условия" }),
 }).refine((d) => d.password === d.confirmPassword, { message: "Passwords don't match", path: ["confirmPassword"] });
 const verifySchema = z.object({ code: z.string().length(6, "6-digit code").regex(/^\d+$/, "Digits only") });
 
@@ -293,6 +294,26 @@ export function AuthModal({ open, onClose, t }: AuthModalProps) {
               {serverError && (
                 <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{serverError}</p>
               )}
+              {/* 152-ФЗ: явное согласие на обработку ПД */}
+              <label className="flex items-start gap-2.5 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  required
+                  className="mt-0.5 w-4 h-4 rounded accent-primary shrink-0"
+                  {...registerForm.register("consent", { required: "Необходимо принять условия" })}
+                />
+                <span className="text-xs text-muted-foreground leading-relaxed">
+                  Я соглашаюсь с{" "}
+                  <a href="/privacy" target="_blank" className="text-primary hover:underline underline-offset-2">
+                    политикой конфиденциальности
+                  </a>{" "}
+                  и даю согласие на обработку персональных данных в соответствии с 152-ФЗ
+                </span>
+              </label>
+              {registerForm.formState.errors.consent && (
+                <p className="text-xs text-destructive">{registerForm.formState.errors.consent.message as string}</p>
+              )}
+
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                 {auth.registerBtn}

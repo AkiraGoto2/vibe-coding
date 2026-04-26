@@ -267,7 +267,12 @@ export default function Home() {
           </Card>
         </div>
 
-        <p className="mt-7 text-xs text-muted-foreground">
+        <p className="mt-4 text-xs text-muted-foreground">
+          <a href="/privacy" className="hover:text-foreground underline underline-offset-4 transition-colors">
+            {language === "ru" ? "Политика конфиденциальности" : "Privacy Policy"}
+          </a>
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
           {t.pressSpace}{" "}
           <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">Space</kbd>{" "}
           {t.toToggle}
