@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { createSession } from "@/lib/auth";
 import { registerSchema } from "@/lib/validations";
-import { generateOTP, sendVerificationEmail } from "@/lib/email";
 import { checkRateLimit, authRatelimit } from "@/lib/ratelimit";
 import { logger } from "@/lib/logger";
 
@@ -24,20 +24,12 @@ export async function POST(req: NextRequest) {
 
     const { name, email, password } = parsed.data;
 
-    // Test DB — show real error in dev
     try {
       await db.$queryRaw`SELECT 1`;
     } catch (dbErr) {
       const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
       logger.error({ dbErr }, "DB connection test failed");
-      return NextResponse.json(
-        {
-          error: process.env.NODE_ENV !== "production"
-            ? `DB error: ${msg}`
-            : "Database unavailable. Contact support.",
-        },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: `DB error: ${msg}` }, { status: 503 });
     }
 
     const existing = await db.user.findUnique({ where: { email } });
@@ -47,35 +39,26 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    await db.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: { name, email, passwordHash, emailVerified: false },
+    // Auto-verify: no email confirmation needed
+    const user = await db.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: { name, email, passwordHash, emailVerified: true },
       });
-      await tx.userSettings.create({ data: { userId: user.id } });
+      await tx.userSettings.create({ data: { userId: newUser.id } });
+      return newUser;
     });
 
-    const code = generateOTP();
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    // Auto-login after registration
+    await createSession(user.id, user.email, user.name, user.role);
 
-    await db.verificationCode.updateMany({
-      where: { email, used: false },
-      data: { used: true },
-    });
-    await db.verificationCode.create({ data: { email, code, expiresAt } });
+    logger.info({ email }, "User registered and logged in");
 
-    const { success: emailSent, error: emailError } = await sendVerificationEmail(email, name, code);
-    if (!emailSent) {
-      logger.warn({ email, emailError }, "Verification email failed");
-    }
-
-    logger.info({ email }, "User registered");
-    return NextResponse.json({ ok: true, requiresVerification: true }, { status: 201 });
+    return NextResponse.json({
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    }, { status: 201 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error({ err, ip }, "Register error");
-    return NextResponse.json(
-      { error: process.env.NODE_ENV !== "production" ? `Server error: ${msg}` : "Server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: `Server error: ${msg}` }, { status: 500 });
   }
 }

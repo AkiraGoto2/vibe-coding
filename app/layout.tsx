@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/hooks/use-auth'
+import { CookieBanner } from '@/components/cookie-banner'
 import './globals.css'
 
 const geist     = Geist({ subsets: ['latin'], variable: '--font-geist' })

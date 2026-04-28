@@ -24,20 +24,12 @@ export async function POST(req: NextRequest) {
 
     const { email, password } = parsed.data;
 
-    // Test DB
     try {
       await db.$queryRaw`SELECT 1`;
     } catch (dbErr) {
       const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
       logger.error({ dbErr }, "DB connection test failed in login");
-      return NextResponse.json(
-        {
-          error: process.env.NODE_ENV !== "production"
-            ? `DB error: ${msg}`
-            : "Database unavailable.",
-        },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: `DB error: ${msg}` }, { status: 503 });
     }
 
     const user = await db.user.findUnique({ where: { email } });
@@ -49,13 +41,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
-    if (!user.emailVerified) {
-      return NextResponse.json(
-        { error: "Email not verified", requiresVerification: true, email },
-        { status: 403 }
-      );
-    }
-
     await createSession(user.id, user.email, user.name, user.role);
     logger.info({ email }, "User logged in");
 
@@ -65,9 +50,6 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error({ err, ip }, "Login error");
-    return NextResponse.json(
-      { error: process.env.NODE_ENV !== "production" ? `Server error: ${msg}` : "Server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: `Server error: ${msg}` }, { status: 500 });
   }
 }
